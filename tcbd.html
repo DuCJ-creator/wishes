@@ -36,7 +36,7 @@
             z-index: 10;
         }
         
-        /* 聲音提示按鈕 (右上角) */
+        /* 聲音提示按鈕 (關鍵修正：確保 top/right 正確且 z-index 優先級最高) */
         #audio-prompt {
             position: fixed;
             top: 20px; 
@@ -49,7 +49,7 @@
             cursor: pointer;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
             transition: opacity 0.5s, transform 0.3s, background-color 0.5s;
-            z-index: 100; 
+            z-index: 100; /* 確保在最上層 */
             border: none;
             font-size: 1.1em;
             font-weight: bold;
@@ -59,7 +59,7 @@
             transform: scale(1.05);
         }
         
-        /* 靜態定位文字 */
+        /* 靜態定位文字 (莫蘭迪灰藍色帶光暈) */
         .static-text {
             position: fixed;
             color: var(--morandi-blue); 
@@ -90,7 +90,7 @@
         /* 指示文字位置 */
         .instructions {
             position: fixed;
-            top: 60px; 
+            top: 60px; /* 相對於按鈕位置向下移動 */
             right: 20px;
             font-size: 1em;
             opacity: 0.7;
@@ -202,7 +202,7 @@
             const color = new THREE.Color();
             
             const material = new THREE.PointsMaterial({
-                size: 0.15, // 粒子太粗，改成 0.15
+                size: 0.15, // 細粒子
                 vertexColors: true, 
                 blending: THREE.AdditiveBlending, 
                 transparent: true,
@@ -221,7 +221,6 @@
                 positions[i * 3 + 2] = point.z;
 
                 // 鉑金色配置：冷色調 (藍/紫)，高飽和，高亮度
-                // H: 0.6-0.7 (藍紫), S: 0.8-1.0, L: 0.8-1.0
                 color.setHSL(0.6 + Math.random() * 0.1, 0.8, 0.8 + Math.random() * 0.2); 
 
                 colors[i * 3] = color.r;
@@ -353,14 +352,14 @@
             
             if (textGroup) {
                 // 延遲爆炸動畫，用 Three.js 內建方法執行
-                if (!explosionStarted && elapsedTime >= 0.5) { // 畫面穩定 0.5 秒後才開始
+                if (!explosionStarted && elapsedTime >= 0.5) { 
                     explosionStarted = true;
                 }
 
                 if (explosionStarted) {
                     // 計算爆炸進度 (從 0 到 1)
                     let progress = (elapsedTime - 0.5) / EXPLOSION_DURATION; 
-                    progress = Math.min(1.0, progress); // 限制進度最大為 1
+                    progress = Math.min(1.0, progress); 
                     
                     // 平滑過渡函數 (類 Exponential.Out)
                     const easedProgress = 1 - Math.pow(1 - progress, 3);
@@ -379,7 +378,6 @@
                             const numSentences = textGroup.children.length;
                             const pathSpread = 1 / numSentences; 
                             
-                            // 確保跳動的起始時間正確
                             const jumpTime = Math.max(0, elapsedTime - JUMP_START_TIME); 
                             const t = jumpTime * 0.05 + sprite.userData.pathIndex * pathSpread; 
                             
