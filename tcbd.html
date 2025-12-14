@@ -8,10 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Vidaloka&display=swap" rel="stylesheet">
 
     <style>
-        /* 莫蘭迪色系定義 */
         :root {
-            --morandi-blue: #A9B7C7; /* 統一的灰藍色 (靜態文字和 3D 賀詞) */
-            --sapphire-bg: #08122C; /* 深藍寶石背景 */
+            --morandi-blue: #A9B7C7; 
+            --sapphire-bg: #08122C; 
         }
         
         body {
@@ -37,20 +36,20 @@
             z-index: 10;
         }
         
-        /* 聲音提示按鈕 */
+        /* 聲音提示按鈕 (右上角) */
         #audio-prompt {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            top: 20px; 
+            right: 20px; 
             pointer-events: auto; 
-            background: rgba(44, 62, 80, 0.8);
+            background: rgba(44, 62, 80, 0.9);
             color: white;
-            padding: 12px 18px;
+            padding: 10px 16px; 
             border-radius: 50px; 
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
             transition: opacity 0.5s, transform 0.3s, background-color 0.5s;
-            z-index: 20;
+            z-index: 100; 
             border: none;
             font-size: 1.1em;
             font-weight: bold;
@@ -60,7 +59,7 @@
             transform: scale(1.05);
         }
         
-        /* 靜態定位文字 - 莫蘭迪灰藍色與柔和光暈 */
+        /* 靜態定位文字 */
         .static-text {
             position: fixed;
             color: var(--morandi-blue); 
@@ -68,8 +67,6 @@
             letter-spacing: 3px; 
             z-index: 15;
             font-family: 'Vidaloka', 'Georgia', serif; 
-            
-            /* 莫蘭迪色系柔和光暈 */
             text-shadow: 
                 0 0 5px rgba(169, 183, 199, 0.8), 
                 0 0 15px rgba(169, 183, 199, 0.6), 
@@ -90,9 +87,10 @@
             opacity: 0.9;
         }
         
+        /* 指示文字位置 */
         .instructions {
             position: fixed;
-            top: 20px;
+            top: 60px; 
             right: 20px;
             font-size: 1em;
             opacity: 0.7;
@@ -111,7 +109,7 @@
     <div class="static-text" id="text-bottom-right">From Shirley on 2025-12-14</div>
     
     <div id="overlay">
-        <div class="instructions">（拖曳畫面可控制星塵的視角）</div>
+        <div class="instructions">（拖曳或滑動畫面可環繞莫比烏斯環）</div>
     </div>
     
     <button id="audio-prompt">🎶 點此播放音樂</button>
@@ -121,6 +119,7 @@
         let starField, mobiusRing, textGroup;
         let clock = new THREE.Clock();
         let isMuted = true; 
+        let audio;
         
         const audioUrl = 'https://ducj-creator.github.io/wishes/happy-birthday.mp3'; 
 
@@ -128,9 +127,12 @@
         const M_WIDTH = 6;
         const M_NUM_PARTICLES = 40000;
         const ART_FONT = 'Vidaloka, Georgia, serif'; 
-        
-        // 統一的莫蘭迪灰藍色，用於 3D 賀詞
         const MORANDI_BLUE = '#A9B7C7'; 
+        
+        // 爆炸動畫狀態
+        let explosionStarted = false;
+        const EXPLOSION_DURATION = 3.0; // 3 秒爆炸時間
+        const JUMP_START_TIME = 3.5; // 3.5 秒後開始跳動
 
         // --- 莫比烏斯環的參數化方程函數 (體積點) ---
         function getMobiusPoint(u, v, radius = M_RADIUS, width = M_WIDTH) {
@@ -152,26 +154,38 @@
             return new THREE.Vector3(x, y, z);
         }
         
-        // --- 初始化場景 ---
+        // --- 初始化場景 (穩定版) ---
         function init() {
+            if (!window.WebGLRenderingContext) {
+                 alert("您的瀏覽器不支持 WebGL，3D 賀卡無法顯示。");
+                 return;
+            }
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // 設置藍寶石背景色
             renderer.setClearColor(0x08122C); 
             document.getElementById('container').appendChild(renderer.domElement);
 
             scene = new THREE.Scene();
+            
+            // 強制光源：高強度點光源 (這是確保不黑屏的關鍵)
+            const pointLight = new THREE.PointLight(0xFFFFFF, 5.0, 100);
+            pointLight.position.set(0, 5, 20); 
+            scene.add(pointLight);
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 30;
+            camera.position.z = 30; 
             
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true; 
             controls.dampingFactor = 0.05;
             controls.autoRotate = true; 
-            controls.autoRotateSpeed = 0.5; 
+            controls.autoRotateSpeed = 0.5;
             controls.maxDistance = 80; 
             controls.minDistance = 15; 
+            controls.enablePan = false; 
 
+            // 建立所有視覺元素
             createStarField();
             createMobiusRingVisual(); 
             createTextSentences(); 
@@ -180,7 +194,7 @@
             animate();
         }
         
-        // --- 莫比烏斯環視覺效果 (金色到銀白色漸變星塵) ---
+        // --- 莫比烏斯環視覺效果 (鉑金色細粒) ---
         function createMobiusRingVisual() {
             const geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(M_NUM_PARTICLES * 3);
@@ -188,9 +202,9 @@
             const color = new THREE.Color();
             
             const material = new THREE.PointsMaterial({
-                size: 0.15, 
+                size: 0.15, // 粒子太粗，改成 0.15
                 vertexColors: true, 
-                blending: THREE.AdditiveBlending, // 創造發光效果
+                blending: THREE.AdditiveBlending, 
                 transparent: true,
                 opacity: 1.0, 
                 sizeAttenuation: true
@@ -206,24 +220,10 @@
                 positions[i * 3 + 1] = point.y;
                 positions[i * 3 + 2] = point.z;
 
-                // 實現金色到銀白色的漸變：
-                // 根據莫比烏斯環的 'u' 參數 (沿環的長度) 改變 HSL 色相 (Hue) 和飽和度 (Saturation)。
-                // HUE (色相): 從金色(0.1)到白色/銀色(0.0)
-                // SATURATION (飽和度): 從高飽和(1.0)到低飽和(0.1)
-                
-                // 創建一個從 0 到 1 的漸變因子
-                const gradientFactor = u; 
+                // 鉑金色配置：冷色調 (藍/紫)，高飽和，高亮度
+                // H: 0.6-0.7 (藍紫), S: 0.8-1.0, L: 0.8-1.0
+                color.setHSL(0.6 + Math.random() * 0.1, 0.8, 0.8 + Math.random() * 0.2); 
 
-                // 色相 (H): 從金色 0.1 (橙黃) 漸變到 銀白色 0.0 (紅色基底，但飽和度會降為白色)
-                const h = THREE.MathUtils.lerp(0.1, 0.0, gradientFactor); 
-                
-                // 飽和度 (S): 從 1.0 (高飽和，即暖金色) 漸變到 0.1 (低飽和，即銀白色)
-                const s = THREE.MathUtils.lerp(1.0, 0.1, gradientFactor); 
-                
-                // 亮度 (L): 保持極高，確保發光效果
-                const l = 1.0 + Math.random() * 0.5; 
-
-                color.setHSL(h, s, l); 
                 colors[i * 3] = color.r;
                 colors[i * 3 + 1] = color.g;
                 colors[i * 3 + 2] = color.b;
@@ -236,7 +236,7 @@
             scene.add(mobiusRing);
         }
         
-        // --- 3D 祝賀句子 (統一使用莫蘭迪灰藍色) ---
+        // --- 3D 祝賀句子 (莫蘭迪灰藍色) ---
         function createTextSentences() {
             textGroup = new THREE.Group();
             scene.add(textGroup);
@@ -252,7 +252,7 @@
                 const context = canvas.getContext('2d');
                 
                 const FONT_SIZE = 48 * sizeScale;
-                context.font = `Bold ${FONT_SIZE}px ${ART_FONT}`; 
+                context.font = `Bold ${FONT_SIZE}px 'Vidaloka', 'Georgia', serif`; 
                 
                 const metrics = context.measureText(sentence);
                 const textWidth = metrics.width;
@@ -260,10 +260,9 @@
                 canvas.width = textWidth + 40;
                 canvas.height = 80 * sizeScale;
                 
-                context.font = `Bold ${FONT_SIZE}px ${ART_FONT}`;
+                context.font = `Bold ${FONT_SIZE}px 'Vidaloka', 'Georgia', serif`;
                 context.fillStyle = sentenceColor; 
                 
-                // 莫蘭迪色系柔和光暈
                 context.shadowColor = 'rgba(255, 255, 255, 0.6)'; 
                 context.shadowBlur = 10;
                 
@@ -282,6 +281,9 @@
                 const sprite = new THREE.Sprite(material);
                 
                 sprite.scale.set(1.5 * textWidth / 48, 1.5 * sizeScale, 1.0); 
+                
+                // 初始位置設定為原點 (爆炸起點)
+                sprite.position.set(0, 0, 0); 
                 return sprite;
             }
 
@@ -289,11 +291,12 @@
                 const sprite = createTextSprite(s.text, s.color, s.scale);
                 sprite.userData.phase = i * Math.PI / 3; 
                 sprite.userData.pathIndex = i; 
+                sprite.userData.targetPos = getMobiusPath(sprite.userData.pathIndex / sentences.length);
                 textGroup.add(sprite);
             });
         }
         
-        // --- 背景星塵 (金色調) ---
+        // --- 背景星塵 ---
         function createStarField() {
             const starGeometry = new THREE.BufferGeometry();
             const starCount = 15000;
@@ -308,7 +311,7 @@
                     (Math.random() - 0.5) * spread,
                     (Math.random() - 0.5) * spread
                 );
-                // 金色調的背景星塵 (較暗)
+                // 星塵保持深空暖光
                 color.setHSL(0.1, 0.5, 0.8 + Math.random() * 0.2); 
                 colors.push(color.r, color.g, color.b);
             }
@@ -345,93 +348,100 @@
             }
             
             if (mobiusRing) {
-                mobiusRing.rotation.z += 0.001; 
+                mobiusRing.rotation.z += 0.0005; 
             }
             
-            // 更新 3D 句子組的位置和跳動效果
             if (textGroup) {
-                const numSentences = textGroup.children.length;
-                const pathSpread = 1 / numSentences; 
-                
-                textGroup.children.forEach((sprite, i) => {
-                    const progress = sprite.userData.pathIndex * pathSpread; 
-                    const t = elapsedTime * 0.05 + progress; 
+                // 延遲爆炸動畫，用 Three.js 內建方法執行
+                if (!explosionStarted && elapsedTime >= 0.5) { // 畫面穩定 0.5 秒後才開始
+                    explosionStarted = true;
+                }
+
+                if (explosionStarted) {
+                    // 計算爆炸進度 (從 0 到 1)
+                    let progress = (elapsedTime - 0.5) / EXPLOSION_DURATION; 
+                    progress = Math.min(1.0, progress); // 限制進度最大為 1
                     
-                    const centerPos = getMobiusPath(t);
-                    
-                    const jump = Math.sin(elapsedTime * 0.8 + sprite.userData.phase) * 3.0; 
-                    
-                    sprite.position.x = centerPos.x;
-                    sprite.position.y = centerPos.y;
-                    sprite.position.z = centerPos.z + jump;
-                });
+                    // 平滑過渡函數 (類 Exponential.Out)
+                    const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+                    textGroup.children.forEach((sprite, i) => {
+                        const target = sprite.userData.targetPos;
+                        const current = sprite.position;
+
+                        if (progress < 1.0) {
+                            // 線性插值：從 (0, 0, 0) 平滑過渡到目標位置
+                            current.x = THREE.MathUtils.lerp(0, target.x, easedProgress);
+                            current.y = THREE.MathUtils.lerp(0, target.y, easedProgress);
+                            current.z = THREE.MathUtils.lerp(0, target.z, easedProgress);
+                        } else {
+                            // 爆炸結束，開始莫比烏斯環上的跳動
+                            const numSentences = textGroup.children.length;
+                            const pathSpread = 1 / numSentences; 
+                            
+                            // 確保跳動的起始時間正確
+                            const jumpTime = Math.max(0, elapsedTime - JUMP_START_TIME); 
+                            const t = jumpTime * 0.05 + sprite.userData.pathIndex * pathSpread; 
+                            
+                            const centerPos = getMobiusPath(t);
+                            const jump = Math.sin(jumpTime * 0.8 + sprite.userData.phase) * 3.0; 
+                            
+                            sprite.position.x = centerPos.x;
+                            sprite.position.y = centerPos.y;
+                            sprite.position.z = centerPos.z + jump;
+                        }
+                    });
+                }
             }
             
             controls.update(); 
             renderer.render(scene, camera);
         }
 
-        // --- 聲音控制邏輯 ---
-        let audio;
-
+        // --- 聲音控制邏輯 (與 Three.js 獨立) ---
         function updateAudioButton(muted) {
             const prompt = document.getElementById('audio-prompt');
             if (muted) {
-                prompt.textContent = '🎶 點此播放音樂';
-                prompt.style.backgroundColor = 'rgba(44, 62, 80, 0.8)';
+                prompt.innerHTML = '🎶 點此播放音樂';
+                prompt.style.backgroundColor = 'rgba(44, 62, 80, 0.9)';
             } else {
-                prompt.textContent = '🔇 靜音';
-                prompt.style.backgroundColor = 'rgba(231, 76, 60, 0.8)';
+                prompt.innerHTML = '🔇 靜音';
+                prompt.style.backgroundColor = 'rgba(231, 76, 60, 0.9)';
             }
         }
 
         function toggleAudio() {
+            if (!audio) return; 
+
             if (isMuted) {
-                if (audio) {
-                    audio.muted = false;
-                    audio.play().then(() => {
-                        console.log("音樂播放成功！");
-                    }).catch(e => {
-                        console.error("音樂播放失敗，請檢查檔案是否在同一伺服器且路徑正確或有 CORS 錯誤。", e);
-                        alert("音訊播放可能需要您的瀏覽器互動。請再點擊一次播放按鈕。");
-                    });
+                audio.muted = false;
+                audio.play().then(() => {
                     isMuted = false;
                     updateAudioButton(false);
-                }
+                }).catch(e => {
+                    console.error("音樂播放失敗。", e);
+                    isMuted = false;
+                    updateAudioButton(false);
+                });
             } else {
-                if (audio) {
-                    audio.muted = true;
-                    isMuted = true;
-                    updateAudioButton(true);
-                }
+                audio.muted = true;
+                isMuted = true;
+                updateAudioButton(true);
             }
         }
-        
-        // 頁面載入後，自動啟動 3D 渲染，並準備音樂
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!window.WebGLRenderingContext) {
-                 alert("您的瀏覽器不支持 WebGL，3D 賀卡無法顯示。");
-                 return;
-            }
-            init();
 
+        function setupAudio() {
             audio = new Audio(audioUrl);
             audio.loop = true; 
             audio.volume = 0.5;
             
             document.getElementById('audio-prompt').addEventListener('click', toggleAudio);
-            
-            // 嘗試靜音自動播放
-            audio.muted = true;
-            audio.play().then(() => {
-                isMuted = true;
-                updateAudioButton(true);
-                console.log("音訊已預載入 (靜音)。");
-            }).catch(e => {
-                isMuted = true;
-                updateAudioButton(true);
-                console.log("音訊預載入失敗，等待用戶手動點擊按鈕。");
-            });
+            updateAudioButton(true); 
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            setupAudio();
+            init();
         });
     </script>
 </body>
