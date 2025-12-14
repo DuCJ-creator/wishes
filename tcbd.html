@@ -36,7 +36,7 @@
             z-index: 10;
         }
         
-        /* 聲音提示按鈕 (關鍵修正：確保 top/right 正確且 z-index 優先級最高) */
+        /* 聲音提示按鈕 (右上角) */
         #audio-prompt {
             position: fixed;
             top: 20px; 
@@ -90,7 +90,7 @@
         /* 指示文字位置 */
         .instructions {
             position: fixed;
-            top: 60px; /* 相對於按鈕位置向下移動 */
+            top: 60px; 
             right: 20px;
             font-size: 1em;
             opacity: 0.7;
@@ -348,6 +348,9 @@
             
             if (mobiusRing) {
                 mobiusRing.rotation.z += 0.0005; 
+                
+                // 新增：莫比烏斯環整體沿 Z 軸跳動
+                mobiusRing.position.z = Math.sin(elapsedTime * 1.5) * 1.0; // 頻率 1.5，幅度 1.0
             }
             
             if (textGroup) {
@@ -386,7 +389,8 @@
                             
                             sprite.position.x = centerPos.x;
                             sprite.position.y = centerPos.y;
-                            sprite.position.z = centerPos.z + jump;
+                            // 文字的跳動需要加上莫比烏斯環的整體跳動，使文字跟隨莫比烏斯環一起動
+                            sprite.position.z = centerPos.z + jump + mobiusRing.position.z; 
                         }
                     });
                 }
