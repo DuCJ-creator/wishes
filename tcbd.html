@@ -243,7 +243,7 @@
             const sentences = [
                 { text: "Happy Birthday", color: MORANDI_BLUE, scale: 2.0 }, 
                 { text: "生日快樂", color: MORANDI_BLUE, scale: 1.5 }, 
-                { text: "身體健康", color: MORANDI_BLUE, scale: 1.5 }  
+                { text: "身體健康 玩得歡樂", color: MORANDI_BLUE, scale: 1.5 }  
             ];
             
             function createTextSprite(sentence, sentenceColor, sizeScale) {
@@ -279,8 +279,14 @@
                 });
                 const sprite = new THREE.Sprite(material);
                 
-                sprite.scale.set(1.5 * textWidth / 48, 1.5 * sizeScale, 1.0); 
+                const BASE_SCALE_X = 1.5 * textWidth / 48;
+                const BASE_SCALE_Y = 1.5 * sizeScale;
                 
+                sprite.scale.set(BASE_SCALE_X, BASE_SCALE_Y, 1.0); 
+                // 將基礎縮放值儲存到 userData，用於爆炸時的計算
+                sprite.userData.baseScaleX = BASE_SCALE_X;
+                sprite.userData.baseScaleY = BASE_SCALE_Y;
+
                 // 初始位置設定為原點 (爆炸起點)
                 sprite.position.set(0, 0, 0); 
                 return sprite;
@@ -349,12 +355,12 @@
             if (mobiusRing) {
                 mobiusRing.rotation.z += 0.0005; 
                 
-                // 新增：莫比烏斯環整體沿 Z 軸跳動
-                mobiusRing.position.z = Math.sin(elapsedTime * 1.5) * 1.0; // 頻率 1.5，幅度 1.0
+                // 莫比烏斯環整體沿 Z 軸跳動
+                mobiusRing.position.z = Math.sin(elapsedTime * 1.5) * 1.0; 
             }
             
             if (textGroup) {
-                // 延遲爆炸動畫，用 Three.js 內建方法執行
+                // 延遲爆炸動畫
                 if (!explosionStarted && elapsedTime >= 0.5) { 
                     explosionStarted = true;
                 }
@@ -364,20 +370,40 @@
                     let progress = (elapsedTime - 0.5) / EXPLOSION_DURATION; 
                     progress = Math.min(1.0, progress); 
                     
-                    // 平滑過渡函數 (類 Exponential.Out)
+                    // 平滑過渡函數
                     const easedProgress = 1 - Math.pow(1 - progress, 3);
 
                     textGroup.children.forEach((sprite, i) => {
                         const target = sprite.userData.targetPos;
                         const current = sprite.position;
+                        const BASE_SCALE_X = sprite.userData.baseScaleX;
+                        const BASE_SCALE_Y = sprite.userData.baseScaleY;
 
                         if (progress < 1.0) {
+                            // --- 🎆 般爆炸閃光效果 (縮放) ---
+                            let burstMagnitude = 0;
+                            if (progress < 0.5) {
+                                // 在前 0.5 秒內，將縮放從 1.0 爆發到 1.3，然後回到 1.0
+                                // Math.sin(x * PI * 2) * 0.3 會在 x=0.25 時達到 0.3 的峰值
+                                burstMagnitude = Math.sin(progress * Math.PI * 2) * 0.3; 
+                            }
+                            burstMagnitude = Math.max(0, burstMagnitude); 
+                            let burstScaleFactor = 1.0 + burstMagnitude;
+
                             // 線性插值：從 (0, 0, 0) 平滑過渡到目標位置
                             current.x = THREE.MathUtils.lerp(0, target.x, easedProgress);
                             current.y = THREE.MathUtils.lerp(0, target.y, easedProgress);
                             current.z = THREE.MathUtils.lerp(0, target.z, easedProgress);
+                            
+                            // 應用臨時縮放爆發
+                            sprite.scale.x = BASE_SCALE_X * burstScaleFactor;
+                            sprite.scale.y = BASE_SCALE_Y * burstScaleFactor;
+
                         } else {
                             // 爆炸結束，開始莫比烏斯環上的跳動
+                            sprite.scale.x = BASE_SCALE_X;
+                            sprite.scale.y = BASE_SCALE_Y;
+
                             const numSentences = textGroup.children.length;
                             const pathSpread = 1 / numSentences; 
                             
@@ -389,7 +415,7 @@
                             
                             sprite.position.x = centerPos.x;
                             sprite.position.y = centerPos.y;
-                            // 文字的跳動需要加上莫比烏斯環的整體跳動，使文字跟隨莫比烏斯環一起動
+                            // 文字的跳動需要加上莫比烏斯環的整體跳動
                             sprite.position.z = centerPos.z + jump + mobiusRing.position.z; 
                         }
                     });
